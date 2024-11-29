@@ -67,15 +67,40 @@ deckOf52 = [mkCard x y | x <- [Spades, Clubs, Diamonds, Hearts], y <- [Ace .. Ki
 deckCorrect :: Deck -> Bool
 deckCorrect deck = sort deck == sort deckOf52
 
-{- Incorrect deck to check deskCorrect function is accurate -}
+{- Incorrect deck to check deckCorrect function is accurate -}
 incorrectDeck :: [Card]
 incorrectDeck = zipWith mkCard [Spades, Clubs, Diamonds, Hearts] [Ace .. King]
 
 {- Shuffling -}
 
-{- EXERCISE 2: Fisher-Yates Shuffle -}
+{- EXERCISE 2: Fisher-Yates Shuffle 
+
+To shuffle an array a of n elements (indices 0..n-1):
+    
+    for i from 0 to n - 2 do
+         j <- random integer such that i <= j < n
+         exchange a[i] and a[j]
+
+-}
+{-- replace getLine seed with some real entropy later --}
+seedRNG :: IO StdGen
+seedRNG = do
+    num <- getLine
+    let (num') = read num
+    return (mkStdGen ( num'))
+
 shuffle :: StdGen -> Deck -> Deck
+shuffle rng [] = []
 shuffle rng deck = error "fill in 'shuffle' in Deck.hs"
+
+swap :: [Card] -> Int -> Int -> [Card]
+swap deck i j
+  | i == j    = deck  -- No need to swap if indices are the same
+  | otherwise = [ if k == i then deck !! j  -- Replace element at i with element at j
+                  else if k == j then deck !! i  -- Replace element at j with element at i
+                  else x  -- Leave all other elements unchanged
+                | (x, k) <- zip deck [0..] ]  -- Pair each element with its index
+
 
 {- shuffleDeck is called by Main.hs when setting up -}
 shuffleDeck :: IO Deck
