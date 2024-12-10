@@ -62,18 +62,73 @@ data Board = MkBoard {
 
 {- EXERCISE 3: Show instance for the board -}
 {- We recommend writing helper functions. -}
+{-instance Show Board where
+    show b = error "fill in 'Show' instance for Board data type in Game.hs" -}
 instance Show Board where
-    show b = error "fill in 'Show' instance for Board data type in Game.hs"
+    show board = separator ++ body ++ separator
+        where 
+            body = "Board:\n\nDeck size: " ++ show (length (boardDeck board)) ++
+                   "\n\nDiscard: " ++ show (boardDiscard board) ++
+                   "\n\nPillars:\n" ++ show (boardPillars board) ++
+                   "\n\nColumns:\n" ++ formatColumnsSideBySide (boardColumns board)
+            separator = "\n --------------------------------- \n"
+
+-- Format columns side by side without padding
+formatColumnsSideBySide :: [Column] -> String
+formatColumnsSideBySide columns =
+    unlines (headerRow : map formatRow [0..maxHeight - 1])
+  where
+    -- Find the maximum column height
+    maxHeight = maximum (map length columns)
+
+    -- Create the column headers
+    headerRow = "  " ++ unwords (map (\i -> " " ++ show i ++ " ") [0 .. length columns - 1])
+
+    -- Extract a row of cards from all columns, indexed by `rowIndex`
+    formatRow rowIndex = "  " ++ unwords [formatCard (getCardAt col rowIndex) | col <- columns]
+
+    -- Safely get a card at a specific index in a column
+    getCardAt :: Column -> Int -> Maybe (Card, Bool)
+    getCardAt col idx = if idx < length col then Just (col !! idx) else Nothing
+
+    -- Format a single card, hiding its value if visibility is False
+    formatCard :: Maybe (Card, Bool) -> String
+    formatCard Nothing = "   "  -- Empty space for missing cards
+    formatCard (Just (card, visible))
+        | not visible = "???"
+        | otherwise   = show card
+
+
 
 {- EXERCISE 4: Board Setup -}
 setup :: Deck -> Board
-setup d = error "fill in 'setup' in Game.hs"
+setup deck = MkBoard {
+    boardDeck = remainingDeck,
+    boardDiscard = [],
+    boardPillars = emptyPillars,
+    boardColumns = columns
+  }
+  where
+    -- Deal cards for the columns
+    (columns, remainingDeck) = dealColumns 1 [] deck
+
+    -- Recursive function to deal cards for columns
+    dealColumns :: Int -> [Column] -> Deck -> ([Column], Deck)
+    dealColumns 8 cols remaining = (reverse cols, remaining) -- Stop when 7 columns are created
+    dealColumns n cols remaining =
+        let (colCards, rest) = splitAt n remaining  -- Take `n` cards for this column
+            column = zip colCards (replicate (n - 1) False ++ [True]) -- Make last card visible
+        in dealColumns (n + 1) (column : cols) rest
 
 
 
 {- EXERCISE 5: Win checking -}
 isWon :: Board -> Bool
-isWon b = error "fill in 'isWon' in Game.hs"
+isWon board =
+    all (== Just King) [spades pillars, clubs pillars, hearts pillars, diamonds pillars]
+  where
+    pillars = boardPillars board
+
 
 {- Pillar helper functions -}
 -- Gets the pillar for a given suit.
@@ -112,7 +167,14 @@ decPillar ps Diamonds = ps { diamonds = decValue $ diamonds ps }
 
 -- Flips the top card of all columns, if not already flipped
 flipCards :: Board -> Board
-flipCards b = error "fill in 'flipCards' in Game.hs"
+flipCards board = board { boardColumns = map flipTopCard (boardColumns board) }
+  where
+    -- Flip the top card of a column if it is not already flipped
+    flipTopCard :: Column -> Column
+    flipTopCard [] = []  -- An empty column remains empty
+    flipTopCard (x:xs) = (card, True) : xs
+      where (card, _) = x  -- Deconstruct the top card
+
 
 -- Checks whether it's possible to stack the first card onto the second.
 canStack :: Card -> Card -> Bool
@@ -185,3 +247,21 @@ makeMove' Solve b = Right $ solve b
 
 makeMove :: Command -> Board -> Either Error Board
 makeMove cmd b = fmap flipCards (makeMove' cmd b)
+
+
+
+
+
+
+-- SCRATCH AREA FOR CONSTRUCTING TEST BLOCKS AND CODE FRAGMENTS
+
+discard = [mkCard Spades Two, mkCard Diamonds Ace]
+
+testColumn = [(mkCard Spades Five, False), (mkCard Hearts Four, False), (mkCard Spades Three, False), (mkCard Diamonds Two, True)]
+
+winningPillars = MkPillars (Just King) (Just King) (Just King) (Just King)
+
+
+
+-- Create board instance with facedown card to test flipCards method
+testFlipCards = MkBoard deckOf52 

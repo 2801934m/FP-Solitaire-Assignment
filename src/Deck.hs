@@ -82,13 +82,6 @@ To shuffle an array a of n elements (indices 0..n-1):
          exchange a[i] and a[j]
 
 -}
-{-- replace getLine seed with some real entropy later --}
-seedRNG :: IO StdGen
-seedRNG = do
-    num <- getLine
-    let (num') = read num
-    return (mkStdGen ( num'))
-
 shuffle :: StdGen -> Deck -> Deck
 shuffle rng [] = []
 shuffle rng deck = go deck rng 0 (length deck)
@@ -99,21 +92,6 @@ shuffle rng deck = go deck rng 0 (length deck)
           let (j, rng') = randomR (i, n - 1) rng  -- Generate random index j
               swappedDeck = swap deck i j         -- Swap elements at indices i and j
           in go swappedDeck rng' (i + 1) n       -- Recurse with updated deck and generator
-
-
-
-fisherYates :: [Card] -> StdGen -> [Card]
-fisherYates deck gen = fisherYates' deck gen 0 (length deck)
-
--- Helper function for the Fisher-Yates shuffle
-fisherYates' :: [Card] -> StdGen -> Int -> Int -> [Card]
-fisherYates' deck gen i n
-  | i >= n - 1 = deck  -- Base case: stop when i reaches n - 1
-  | otherwise  =
-      let (j, gen') = randomR (i, n - 1) gen  -- Generate random index j such that i <= j < n
-          swappedDeck = swap deck i j         -- Swap elements at indices i and j
-      in fisherYates' swappedDeck gen' (i + 1) n  -- Recurse with updated deck and generator
-
 
 
 swap :: [Card] -> Int -> Int -> [Card]
