@@ -69,9 +69,23 @@ instance Show Board where
         where 
             body = "Board:\n\nDeck size: " ++ show (length (boardDeck board)) ++
                    "\n\nDiscard: " ++ show (boardDiscard board) ++
-                   "\n\nPillars:\n" ++ show (boardPillars board) ++
+                   "\n\nPillars:\n" ++ formatPillars (boardPillars board) ++
                    "\n\nColumns:\n" ++ formatColumnsSideBySide (boardColumns board)
             separator = "\n --------------------------------- \n"
+
+-- Format pillars to display their values side by side
+formatPillars :: Pillars -> String
+formatPillars pillars =
+    "Spades: " ++ formatPillarValue (spades pillars) ++ " | " ++
+    "Clubs: " ++ formatPillarValue (clubs pillars) ++ " | " ++
+    "Hearts: " ++ formatPillarValue (hearts pillars) ++ " | " ++
+    "Diamonds: " ++ formatPillarValue (diamonds pillars)
+
+-- Format individual pillar values
+formatPillarValue :: Maybe Value -> String
+formatPillarValue Nothing = "Empty"
+formatPillarValue (Just value) = show value
+
 
 -- Format columns side by side without padding
 formatColumnsSideBySide :: [Column] -> String
