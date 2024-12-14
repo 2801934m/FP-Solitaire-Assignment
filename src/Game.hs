@@ -258,23 +258,140 @@ move n s1 s2 board
 
 {- EXERCISE 9: Move Stack -}
 moveStack :: Int -> Int -> Board -> Either Error Board
-moveStack from to b = error "fill in 'moveStack' in Game.hs"
+moveStack s1 s2 board = 
+    if null visibleCards 
+        then Left InvalidCount -- No visible cards to move
+        else move (length visibleCards) s1 s2 board
+  where
+    columns = boardColumns board
+    column1 = columns !! s1
+
+    -- Extract visible cards (cards with True in the Bool field)
+    visibleCards = filter snd column1
+
 
 {- EXERCISE 10: Move from Discard -}
 moveFromDiscard :: Int -> Board -> Either Error Board
-moveFromDiscard idx b = error "fill in 'moveFromDiscard' in Game.hs"
+moveFromDiscard colIdx board
+    | null discard = Left DiscardEmpty
+    | null targetCol && not (isKing cardToMove) = Left ColumnKing
+    | not (null targetCol) && not (canStack cardToMove (fst (last targetCol))) = Left WrongOrder
+    | otherwise = Right board {
+        boardDiscard = tail discard, -- Remove the top card from discard pile
+        boardColumns = updateColumn colIdx (targetCol ++ [(cardToMove, True)]) (boardColumns board)
+      }
+  where
+    discard = boardDiscard board
+    targetCol = boardColumns board !! colIdx
+    cardToMove = head discard
+
+    -- Helper to check if a card is a King
+    isKing card = cardValue card == King
+
 
 {- EXERCISE 11: Move to Pillar -} 
 moveToPillar :: CardSource -> Board -> Either Error Board
-moveToPillar cs b = error "fill in 'moveToPillar' in Game.hs"
+moveToPillar source board = case source of
+    FromDiscard ->
+        if null discard
+        then Left DiscardEmpty
+        else moveCardToPillar (head discard) (board { boardDiscard = tail discard })
+
+    FromStack colIdx ->
+        let column = columns !! colIdx
+        in if null column
+           then Left ColumnEmpty
+           else let (card, _) = last column
+                in moveCardToPillar card (board { boardColumns = updateColumn colIdx (init column) columns })
+  where
+    discard = boardDiscard board
+    columns = boardColumns board
+
+    -- Move the card to the appropriate pillar and validate the move
+    moveCardToPillar :: Card -> Board -> Either Error Board
+    moveCardToPillar card b =
+        case cardSuit card of
+            Spades   -> tryAddToPillar card spadesTop (\p -> b { boardPillars = p { spades = Just (cardValue card) } })
+            Clubs    -> tryAddToPillar card clubsTop (\p -> b { boardPillars = p { clubs = Just (cardValue card) } })
+            Hearts   -> tryAddToPillar card heartsTop (\p -> b { boardPillars = p { hearts = Just (cardValue card) } })
+            Diamonds -> tryAddToPillar card diamondsTop (\p -> b { boardPillars = p { diamonds = Just (cardValue card) } })
+      where
+        pillars = boardPillars b
+        spadesTop = spades pillars
+        clubsTop = clubs pillars
+        heartsTop = hearts pillars
+        diamondsTop = diamonds pillars
+
+    -- Validate and apply the move to the pillar
+    tryAddToPillar :: Card -> Maybe Value -> (Pillars -> Board) -> Either Error Board
+    tryAddToPillar card currentValue updatePillar
+        | isValidPillarMove card currentValue = Right (updatePillar (boardPillars board))
+        | otherwise = Left WrongPillarOrder
+
+    -- Check if the move to the pillar is valid
+    isValidPillarMove :: Card -> Maybe Value -> Bool
+    isValidPillarMove card Nothing = cardValue card == Ace
+    isValidPillarMove card (Just topValue) = fromEnum (cardValue card) == fromEnum topValue + 1
+
             
 {- EXERCISE 12: Move from Pillar -}
 moveFromPillar :: Suit -> Int -> Board -> Either Error Board
-moveFromPillar suit idx b = error "fill in 'moveFromPillar' in Game.hs"
+moveFromPillar suit idx board =
+    case getPillarTop suit (boardPillars board) of
+        Nothing -> Left PillarEmpty  -- The pillar is empty
+        Just cardToMove ->
+            let columns = boardColumns board
+                targetCol = columns !! idx
+            in if null targetCol && not (isKing cardToMove)
+               then Left ColumnKing  -- Cannot place a non-King card on an empty column
+               else if not (null targetCol) && not (canStack cardToMove (fst (last targetCol)))
+                    then Left WrongOrder  -- Cannot stack due to Solitaire rules
+                    else Right board {
+                        boardPillars = removeFromPillar suit (boardPillars board),
+                        boardColumns = updateColumn idx (targetCol ++ [(cardToMove, True)]) columns
+                    }
+  where
+    -- Helper function to get the top card of the specified pillar
+    getPillarTop :: Suit -> Pillars -> Maybe Card
+    getPillarTop s ps = case getPillar ps s of
+        Nothing -> Nothing
+        Just value -> Just (MkCard s value)
 
-{- EXERCISE 13: Solve -}
+    -- Helper function to remove the top card from the specified pillar
+    removeFromPillar :: Suit -> Pillars -> Pillars
+    removeFromPillar s ps = decPillar ps s
+
+    -- Helper function to check if a card is a King
+    isKing :: Card -> Bool
+    isKing card = cardValue card == King
+
+
+{- EXERCISE 13: Solve -} 
 solve :: Board -> Board
-solve board = error "fill in 'solve' in Game.hs"
+solve board =
+    let updatedBoard = tryMoveAllToPillars board
+    in if updatedBoard == board
+       then board  -- No changes, stop recursion
+       else solve updatedBoard  -- Keep solving until no more moves are possible
+
+-- Attempt to move all possible cards to the pillars
+tryMoveAllToPillars :: Board -> Board
+tryMoveAllToPillars board = foldl tryMoveFromColumn (tryMoveFromDiscard board) [0..length (boardColumns board) - 1]
+
+-- Attempt to move a card from the discard pile to the pillars
+tryMoveFromDiscard :: Board -> Board
+tryMoveFromDiscard board =
+    case moveToPillar FromDiscard board of
+        Right updatedBoard -> updatedBoard  -- Successful move
+        Left _ -> board  -- No move possible, return unchanged board
+
+-- Attempt to move the top card of a specific column to the pillars
+tryMoveFromColumn :: Board -> Int -> Board
+tryMoveFromColumn board colIdx =
+    case moveToPillar (FromStack colIdx) board of
+        Right updatedBoard -> updatedBoard  -- Successful move
+        Left _ -> board  -- No move possible, return unchanged board
+
 
 
 
