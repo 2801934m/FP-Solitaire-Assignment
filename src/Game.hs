@@ -128,6 +128,8 @@ isWon board =
     all (== Just King) [spades pillars, clubs pillars, hearts pillars, diamonds pillars]
   where
     pillars = boardPillars board
+-- Should there be checks to make sure other structures are empty or is that redundant?
+
 
 
 {- Pillar helper functions -}
@@ -169,32 +171,90 @@ decPillar ps Diamonds = ps { diamonds = decValue $ diamonds ps }
 flipCards :: Board -> Board
 flipCards board = board { boardColumns = map flipTopCard (boardColumns board) }
   where
-    -- Flip the top card of a column if it is not already flipped
+    -- Flip the last card in a column if it is not already flipped
     flipTopCard :: Column -> Column
     flipTopCard [] = []  -- An empty column remains empty
-    flipTopCard (x:xs) = (card, True) : xs
-      where (card, _) = x  -- Deconstruct the top card
+    flipTopCard col =
+        let (initCards, [lastCard]) = splitAt (length col - 1) col
+        in initCards ++ [reveal lastCard]
+
+    -- Reveal a card (set its visibility to True)
+    reveal :: (Card, Bool) -> (Card, Bool)
+    reveal (card, _) = (card, True)
+
+
 
 
 -- Checks whether it's possible to stack the first card onto the second.
 canStack :: Card -> Card -> Bool
-canStack card onto = error "fill in 'canStack' in Game.hs"
+canStack c1 c2 = oppositeColor c1 c2 && oneLessValue c1 c2
+
+-- Check if two cards are of opposite colors
+oppositeColor :: Card -> Card -> Bool
+oppositeColor c1 c2 = isRed c1 /= isRed c2
+
+-- Check if the value of the first card is one less than the second card
+oneLessValue :: Card -> Card -> Bool
+oneLessValue c1 c2 = fromEnum (cardValue c1) + 1 == fromEnum (cardValue c2)
+
 
 -- Updates a column at the given index
 updateColumn :: Int -> Column -> [Column] -> [Column]
-updateColumn n c cs = error "fill in 'updateColumn' in Game.hs"
+updateColumn idx c cs = take idx cs ++ [c] ++ drop (idx + 1) cs
+-- Add guards for invalid input?
 
 -- Checks whether it's possible to place a card onto a pillar.
 canStackOnPillar :: Card -> Maybe Value -> Bool
-canStackOnPillar c mv = error "fill in 'canStackOnPillar' in Game.hs"
+canStackOnPillar c mv = case mv of
+    Nothing        -> cardValue c == Ace
+    Just pillarVal -> fromEnum (cardValue c) == fromEnum pillarVal + 1
+
 
 {- EXERCISE 7: Draw -}
 draw :: Board -> Either Error Board
-draw b = error "fill in 'draw' in Game.hs" 
+draw board
+    | not (null deck) =
+        -- Deck is not empty: draw top card from deck
+        Right board { boardDeck = tail deck, boardDiscard = head deck : discard }
+    | null deck && not (null discard) =
+        -- Deck is empty, but discard is not: reverse discard into a new deck
+        let newDeck = reverse discard
+        in Right board { boardDeck = tail newDeck, boardDiscard = head newDeck : [] }
+    | otherwise =
+        -- Both deck and discard are empty
+        Left DeckEmpty
+  where
+    deck = boardDeck board
+    discard = boardDiscard board
+
 
 {- EXERCISE 8: Move -}
 move :: Int -> Int -> Int -> Board -> Either Error Board
-move count from to b = error "fill in 'move' in Game.hs"
+move n s1 s2 board
+    | n < 1 = Left InvalidCount
+    | length visibleCards < n = Left MovingTooManyCards
+    | null column2 && not (isKing (fst (head visibleCards))) = Left ColumnKing
+    | not (null column2) && not (canStack (fst (head visibleCards)) (fst (last column2))) = Left WrongOrder
+    | otherwise = Right board {
+        boardColumns = updateColumn s2 (column2 ++ movedCards)
+                     $ updateColumn s1 (hiddenCards ++ drop n visibleCards)
+                     $ boardColumns board
+      }
+  where
+    columns = boardColumns board
+    column1 = columns !! s1
+    column2 = columns !! s2
+
+    -- Separate visible and hidden cards in column1
+    (hiddenCards, visibleCards) = span (not . snd) column1
+
+    -- Cards to be moved
+    movedCards = take n visibleCards
+
+    -- Helper function to check if a card is a King
+    isKing card = cardValue card == King
+
+
 
 {- EXERCISE 9: Move Stack -}
 moveStack :: Int -> Int -> Board -> Either Error Board
@@ -260,6 +320,8 @@ discard = [mkCard Spades Two, mkCard Diamonds Ace]
 testColumn = [(mkCard Spades Five, False), (mkCard Hearts Four, False), (mkCard Spades Three, False), (mkCard Diamonds Two, True)]
 
 winningPillars = MkPillars (Just King) (Just King) (Just King) (Just King)
+
+testEmptyPillars = MkPillars Nothing Nothing Nothing Nothing
 
 
 
